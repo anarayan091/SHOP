@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>Laza Store - المنتجات</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+*{
+box-sizing:border-box;
+font-family:Arial,Tahoma,sans-serif
+}
+
+body{
+margin:0;
+background:#080808;
+color:#fff
+}
+
+.container{
+max-width:1100px;
+margin:auto;
+padding:15px
+}
+
+.header{
+padding:20px 0;
+display:flex;
+align-items:center;
+justify-content:space-between
+}
+
+.brand{
+display:flex;
+align-items:center;
+gap:10px
+}
+
+.logo{
+width:48px;
+height:48px;
+border-radius:15px;
+background:#fff;
+color:#111;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:25px;
+font-weight:900
+}
+
+h1{
+margin:0;
+font-size:21px
+}
+
+.subtitle{
+color:#777;
+font-size:11px;
+margin-top:4px
+}
+
+.search{
+width:100%;
+padding:13px;
+border-radius:13px;
+border:1px solid #333;
+background:#121212;
+color:#fff;
+outline:none;
+margin-bottom:15px
+}
+
+.categories{
+display:flex;
+gap:8px;
+overflow-x:auto;
+padding-bottom:12px;
+scrollbar-width:none
+}
+
+.categories::-webkit-scrollbar{
+display:none
+}
+
+.category{
+flex:0 0 auto;
+border:1px solid #303030;
+background:#151515;
+color:#aaa;
+padding:10px 15px;
+border-radius:12px;
+cursor:pointer
+}
+
+.category.active{
+background:#fff;
+color:#111;
+border-color:#fff
+}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(2,minmax(0,1fr));
+gap:12px
+}
+
+.product{
+background:#141414;
+border:1px solid #292929;
+border-radius:18px;
+overflow:hidden
+}
+
+.product img{
+width:100%;
+aspect-ratio:1;
+object-fit:cover;
+display:block;
+background:#222
+}
+
+.no-image{
+width:100%;
+aspect-ratio:1;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:45px;
+background:#202020
+}
+
+.info{
+padding:12px
+}
+
+.name{
+font-size:14px;
+font-weight:900;
+margin-bottom:5px
+}
+
+.description{
+color:#777;
+font-size:11px;
+line-height:1.5;
+min-height:32px
+}
+
+.price{
+font-size:17px;
+font-weight:900;
+margin-top:9px
+}
+
+.currency{
+font-size:11px;
+color:#999
+}
+
+.buy{
+width:100%;
+border:0;
+background:#fff;
+color:#111;
+padding:11px;
+border-radius:11px;
+margin-top:10px;
+font-weight:900;
+cursor:pointer
+}
+
+.loading{
+text-align:center;
+color:#777;
+padding:50px
+}
+
+.empty{
+text-align:center;
+color:#777;
+padding:50px 10px
+}
+
+.error{
+background:#2a1313;
+border:1px solid #602727;
+color:#ff9999;
+padding:13px;
+border-radius:13px;
+font-size:12px
+}
+
+.cart{
+position:fixed;
+left:15px;
+bottom:15px;
+width:60px;
+height:60px;
+border-radius:50%;
+background:#fff;
+color:#111;
+border:0;
+font-size:23px;
+box-shadow:0 5px 25px #000;
+cursor:pointer
+}
+
+.cartCount{
+position:absolute;
+top:-3px;
+right:-3px;
+background:#111;
+color:#fff;
+border:2px solid #fff;
+min-width:23px;
+height:23px;
+border-radius:50%;
+font-size:11px;
+display:flex;
+align-items:center;
+justify-content:center
+}
+
+.toast{
+position:fixed;
+bottom:88px;
+left:50%;
+transform:translateX(-50%);
+background:#fff;
+color:#111;
+padding:11px 16px;
+border-radius:12px;
+font-size:11px;
+font-weight:bold;
+display:none;
+z-index:10
+}
+
+@media(min-width:700px){
+.grid{
+grid-template-columns:repeat(4,minmax(0,1fr))
+}
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<header class="header">
+
+<div class="brand">
+
+<div class="logo">
+L
+</div>
+
+<div>
+
+<h1>Laza Store</h1>
+
+<div class="subtitle">
+اختار المنتج اللي بغيتي
+</div>
+
+</div>
+
+</div>
+
+</header>
+
+
+<input
+id="search"
+class="search"
+type="search"
+placeholder="🔍 بحث عن منتج..."
+>
+
+
+<div
+id="categories"
+class="categories"
+>
+
+<div class="loading">
+جاري تحميل الأقسام...
+</div>
+
+</div>
+
+
+<div id="products">
+
+<div class="loading">
+جاري تحميل المنتجات...
+</div>
+
+</div>
+
+</div>
+
+
+<!-- السلة -->
+
+<button
+id="cartButton"
+class="cart"
+type="button"
+onclick="openCart()"
+aria-label="السلة"
+>
+
+🛒
+
+<span
+id="cartCount"
+class="cartCount"
+>
+0
+</span>
+
+</button>
+
+
+<div
+id="toast"
+class="toast"
+></div>
+
+
+<script>
+
+/* =================================
+   SUPABASE
+================================= */
+
+const SUPABASE_URL =
+"https://qdeiozglrsbernwperwl.supabase.co";
+
+const SUPABASE_KEY =
+"sb_publishable_Vguau5HSLXtO2rUqGd7ZKA_PuoZ6iQ7";
+
+const db =
+window.supabase.createClient(
+SUPABASE_URL,
+SUPABASE_KEY
+);
+
+
+/* =================================
+   DATA
+================================= */
+
+let categories=[];
+
+let products=[];
+
+let selectedCategory=null;
+
+let cart=[];
+
+
+try{
+
+cart=
+JSON.parse(
+localStorage.getItem(
+"laza_cart"
+) || "[]"
+);
+
+if(!Array.isArray(cart))
+cart=[];
+
+}catch{
+
+cart=[];
+
+}
+
+
+/* =================================
+   ESCAPE
+================================= */
+
+function escapeHTML(value){
+
+return String(value ?? "")
+.replaceAll("&","&amp;")
+.replaceAll("<","&lt;")
+.replaceAll(">","&gt;")
+.replaceAll('"',"&quot;")
+.replaceAll("'","&#039;");
+
+}
+
+
+/* =================================
+   TOAST
+================================= */
+
+function showToast(text){
+
+const toast=
+document.getElementById(
+"toast"
+);
+
+toast.textContent=text;
+
+toast.style.display="block";
+
+clearTimeout(
+window.toastTimer
+);
+
+window.toastTimer=
+setTimeout(
+()=>{
+
+toast.style.display="none";
+
+},
+1800
+);
+
+}
+
+
+/* =================================
+   LOAD CATEGORIES
+================================= */
+
+async function loadCategories(){
+
+const {data,error}=
+await db
+.from("laza_categories")
+.select(
+"id,name,image_url"
+);
+
+
+if(error){
+
+document.getElementById(
+"categories"
+).innerHTML=
+
+`
+<div class="error">
+❌ خطأ في تحميل الأقسام:<br>
+${escapeHTML(error.message)}
+</div>
+`;
+
+return;
+
+}
+
+
+categories=data || [];
+
+renderCategories();
+
+}
+
+
+/* =================================
+   CATEGORIES
+================================= */
+
+function renderCategories(){
+
+const box=
+document.getElementById(
+"categories"
+);
+
+box.innerHTML="";
+
+
+const all=
+document.createElement(
+"button"
+);
+
+all.className=
+"category "+
+(
+selectedCategory===null
+?
+"active"
+:
+""
+);
+
+all.textContent="الكل";
+
+
+all.onclick=()=>{
+
+selectedCategory=null;
+
+renderCategories();
+
+renderProducts();
+
+};
+
+
+box.appendChild(all);
+
+
+categories.forEach(
+category=>{
+
+const button=
+document.createElement(
+"button"
+);
+
+button.className=
+"category "+
+(
+String(selectedCategory)===
+String(category.id)
+?
+"active"
+:
+""
+);
+
+button.textContent=
+category.name;
+
+
+button.onclick=()=>{
+
+selectedCategory=
+category.id;
+
+renderCategories();
+
+renderProducts();
+
+};
+
+
+box.appendChild(button);
+
+}
+);
+
+}
+
+
+/* =================================
+   LOAD PRODUCTS
+================================= */
+
+async function loadProducts(){
+
+const {data,error}=
+await db
+.from("laza_products")
+.select(
+"id,category_id,name,image_url,description,price"
+);
+
+
+if(error){
+
+document.getElementById(
+"products"
+).innerHTML=
+
+`
+<div class="error">
+❌ خطأ في تحميل المنتجات:<br>
+${escapeHTML(error.message)}
+</div>
+`;
+
+return;
+
+}
+
+
+products=data || [];
+
+renderProducts();
+
+}
+
+
+/* =================================
+   RENDER PRODUCTS
+================================= */
+
+function renderProducts(){
+
+const box=
+document.getElementById(
+"products"
+);
+
+
+const search=
+document.getElementById(
+"search"
+)
+.value
+.trim()
+.toLowerCase();
+
+
+const list=
+products.filter(
+product=>{
+
+const categoryOK=
+selectedCategory===null ||
+String(product.category_id)===
+String(selectedCategory);
+
+
+const searchOK=
+!search ||
+
+String(
+product.name || ""
+)
+.toLowerCase()
+.includes(search) ||
+
+String(
+product.description || ""
+)
+.toLowerCase()
+.includes(search);
+
+
+return categoryOK && searchOK;
+
+}
+);
+
+
+box.innerHTML="";
+
+
+if(!list.length){
+
+box.innerHTML=
+`
+<div class="empty">
+📦 ما كاين حتى منتج هنا دابا.
+</div>
+`;
+
+return;
+
+}
+
+
+const grid=
+document.createElement(
+"div"
+);
+
+grid.className="grid";
+
+
+list.forEach(
+product=>{
+
+const card=
+document.createElement(
+"div"
+);
+
+card.className="product";
+
+
+const imageHTML=
+product.image_url
+
+?
+
+`
+<img
+src="${escapeHTML(
+product.image_url
+)}"
+alt="${escapeHTML(
+product.name
+)}"
+loading="lazy"
+>
+`
+
+:
+
+`
+<div class="no-image">
+📦
+</div>
+`;
+
+
+card.innerHTML=`
+
+${imageHTML}
+
+<div class="info">
+
+<div class="name">
+${escapeHTML(
+product.name
+)}
+</div>
+
+<div class="description">
+${escapeHTML(
+product.description || ""
+)}
+</div>
+
+<div class="price">
+
+${Number(
+product.price || 0
+).toFixed(2)}
+
+<span class="currency">
+DH
+</span>
+
+</div>
+
+<button
+class="buy"
+type="button"
+>
+🛒 أضف للسلة
+</button>
+
+</div>
+
+`;
+
+
+const button=
+card.querySelector(
+".buy"
+);
+
+
+button.onclick=()=>{
+
+addToCart(product);
+
+};
+
+
+grid.appendChild(card);
+
+}
+);
+
+
+box.appendChild(grid);
+
+}
+
+
+/* =================================
+   ADD TO CART
+================================= */
+
+function addToCart(product){
+
+const existing=
+cart.find(
+item=>
+String(item.id)===
+String(product.id)
+);
+
+
+if(existing){
+
+existing.quantity=
+Number(
+existing.quantity || 1
+)+1;
+
+}else{
+
+cart.push({
+
+id:product.id,
+
+category_id:
+product.category_id,
+
+name:
+product.name,
+
+price:
+Number(
+product.price || 0
+),
+
+image_url:
+product.image_url || null,
+
+quantity:1
+
+});
+
+}
+
+
+localStorage.setItem(
+"laza_cart",
+JSON.stringify(cart)
+);
+
+
+updateCartCount();
+
+showToast(
+"✅ تمت إضافة المنتج للسلة"
+);
+
+}
+
+
+/* =================================
+   CART COUNT
+================================= */
+
+function updateCartCount(){
+
+const count=
+cart.reduce(
+(sum,item)=>
+sum+
+Number(
+item.quantity || 0
+),
+0
+);
+
+
+document.getElementById(
+"cartCount"
+).textContent=
+count;
+
+}
+
+
+/* =================================
+   OPEN CHECKOUT
+================================= */
+
+function openCart(){
+
+if(!cart.length){
+
+showToast(
+"🛒 السلة خاوية"
+);
+
+return;
+
+}
+
+
+window.location.href=
+"checkout.html";
+
+}
+
+
+/* =================================
+   SEARCH
+================================= */
+
+document
+.getElementById("search")
+.addEventListener(
+"input",
+renderProducts
+);
+
+
+/* =================================
+   START
+================================= */
+
+async function start(){
+
+updateCartCount();
+
+await Promise.all([
+loadCategories(),
+loadProducts()
+]);
+
+}
+
+start();
+
+</script>
+
+</body>
+</html>
