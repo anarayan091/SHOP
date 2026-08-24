@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Laza Store - Checkout</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+<style>
+*{box-sizing:border-box;font-family:Arial,Tahoma,sans-serif}
+body{margin:0;background:#080808;color:#fff}
+.container{max-width:700px;margin:auto;padding:15px}
+.header{display:flex;align-items:center;gap:12px;padding:15px 0 20px}
+.logo{width:48px;height:48px;border-radius:15px;background:#fff;color:#111;display:flex;align-items:center;justify-content:center;font-size:25px;font-weight:900}
+.header h1{margin:0;font-size:21px}
+.header p{margin:4px 0 0;color:#777;font-size:11px}
+
+.card{
+background:#151515;
+border:1px solid #292929;
+border-radius:20px;
+padding:16px;
+margin-bottom:14px
+}
+
+.card h2{margin:0 0 14px;font-size:17px}
+
+label{
+display:block;
+color:#bbb;
+font-size:11px;
+font-weight:bold;
+margin:10px 0 6px
+}
+
+input{
+width:100%;
+background:#0b0b0b;
+color:#fff;
+border:1px solid #353535;
+border-radius:12px;
+padding:13px;
+outline:none
+}
+
+input:focus{border-color:#fff}
+
+.products{
+display:flex;
+flex-direction:column;
+gap:10px
+}
+
+.product{
+display:flex;
+align-items:center;
+gap:10px;
+background:#0d0d0d;
+border:1px solid #292929;
+border-radius:14px;
+padding:10px
+}
+
+.product img,
+.no-image{
+width:55px;
+height:55px;
+border-radius:12px;
+object-fit:cover;
+background:#222
+}
+
+.no-image{
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:23px
+}
+
+.product-info{flex:1}
+
+.product-name{
+font-weight:900;
+font-size:13px
+}
+
+.product-details{
+color:#777;
+font-size:11px;
+margin-top:4px
+}
+
+.product-price{
+font-weight:900;
+font-size:13px
+}
+
+.payment{
+width:100%;
+text-align:right;
+background:#0d0d0d;
+color:#fff;
+border:1px solid #333;
+border-radius:15px;
+padding:14px;
+cursor:pointer;
+margin-bottom:10px
+}
+
+.payment.selected{
+border-color:#fff;
+background:#202020
+}
+
+.payment.disabled{
+opacity:.45;
+cursor:not-allowed
+}
+
+.badge{
+float:left;
+background:#252525;
+color:#aaa;
+padding:4px 7px;
+border-radius:7px;
+font-size:9px
+}
+
+.payment-title{font-weight:900}
+
+.payment-description{
+color:#777;
+font-size:10px;
+margin-top:4px
+}
+
+.recharge{
+background:#0d0d0d;
+border:1px solid #292929;
+border-radius:15px;
+padding:13px;
+margin-top:10px
+}
+
+.recharge-header{
+display:flex;
+align-items:center;
+justify-content:space-between
+}
+
+.recharge-number{
+color:#777;
+font-size:11px
+}
+
+.remove{
+border:0;
+background:#291313;
+color:#ff9999;
+padding:6px 9px;
+border-radius:8px;
+cursor:pointer;
+font-size:10px
+}
+
+.add-more{
+width:100%;
+margin-top:12px;
+border:1px dashed #555;
+background:#101010;
+color:#fff;
+padding:12px;
+border-radius:12px;
+cursor:pointer;
+font-weight:bold
+}
+
+.total{
+display:flex;
+justify-content:space-between;
+align-items:center
+}
+
+.total-price{
+font-size:21px;
+font-weight:900
+}
+
+.confirm{
+width:100%;
+border:0;
+background:#fff;
+color:#111;
+padding:14px;
+border-radius:13px;
+font-weight:900;
+cursor:pointer;
+margin-top:12px
+}
+
+.confirm:disabled{
+opacity:.5;
+cursor:not-allowed
+}
+
+.message{
+display:none;
+padding:12px;
+border-radius:12px;
+margin-bottom:12px;
+font-size:11px;
+line-height:1.6
+}
+
+.error{
+display:block;
+background:#291313;
+border:1px solid #602727;
+color:#ff9999
+}
+
+.success{
+display:block;
+background:#10251c;
+border:1px solid #285c47;
+color:#7dffca
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<header class="header">
+<div class="logo">L</div>
+
+<div>
+<h1>Laza Store</h1>
+<p>إتمام الطلب</p>
+</div>
+</header>
+
+<div id="message" class="message"></div>
+
+
+<!-- السلة -->
+
+<div class="card">
+
+<h2>🛒 طلبك</h2>
+
+<div id="products" class="products"></div>
+
+</div>
+
+
+<!-- معلومات الزبون -->
+
+<div class="card">
+
+<h2>👤 معلومات الزبون</h2>
+
+<label>الاسم</label>
+
+<input
+id="customerName"
+type="text"
+placeholder="اكتب اسمك"
+autocomplete="name"
+>
+
+<label>الإيميل</label>
+
+<input
+id="customerEmail"
+type="email"
+placeholder="example@gmail.com"
+autocomplete="email"
+>
+
+</div>
+
+
+<!-- طرق الدفع -->
+
+<div class="card">
+
+<h2>💳 طريقة الدفع</h2>
+
+<button
+id="orangePayment"
+class="payment"
+type="button"
+onclick="selectPayment('orange')"
+>
+
+<span class="badge">متاح</span>
+
+<div class="payment-title">
+🟠 تعبئة Orange
+</div>
+
+<div class="payment-description">
+أدخل قيمة التعبئة ورمز التعبئة.
+</div>
+
+</button>
+
+
+<button
+class="payment disabled"
+type="button"
+disabled
+>
+
+<span class="badge">قريباً</span>
+
+<div class="payment-title">
+🎁 Gift Card
+</div>
+
+<div class="payment-description">
+هاد الطريقة غادي نضيفوها قريباً.
+</div>
+
+</button>
+
+</div>
+
+
+<!-- تعبئة Orange -->
+
+<div
+id="orangeSection"
+class="card"
+style="display:none"
+>
+
+<h2>🟠 التعبئة</h2>
+
+<div id="recharges"></div>
+
+<button
+class="add-more"
+type="button"
+onclick="addRecharge()"
+>
+➕ أضف المزيد
+</button>
+
+</div>
+
+
+<!-- المجموع -->
+
+<div class="card">
+
+<div class="total">
+
+<span>المجموع</span>
+
+<span class="total-price">
+<span id="total">0.00</span> DH
+</span>
+
+</div>
+
+<button
+id="confirmButton"
+class="confirm"
+type="button"
+onclick="confirmOrder()"
+>
+✅ تأكيد الطلب
+</button>
+
+</div>
+
+</div>
+
+
+<script>
+
+/* =========================
+   SUPABASE
+========================= */
+
+const SUPABASE_URL =
+"https://qdeiozglrsbernwperwl.supabase.co";
+
+const SUPABASE_KEY =
+"sb_publishable_Vguau5HSLXtO2rUqGd7ZKA_PuoZ6iQ7";
+
+const db =
+window.supabase.createClient(
+SUPABASE_URL,
+SUPABASE_KEY
+);
+
+
+/* =========================
+   EMAILJS
+========================= */
+
+const EMAILJS_PUBLIC_KEY =
+"lIJCM6PpQ7iUHlJI8";
+
+const EMAILJS_SERVICE =
+"service_rhsuhtu";
+
+const ADMIN_TEMPLATE =
+"template_rxblebt";
+
+const CUSTOMER_TEMPLATE =
+"template_yo8ql8r";
+
+emailjs.init({
+publicKey:EMAILJS_PUBLIC_KEY
+});
+
+
+/* =========================
+   CART
+========================= */
+
+let cart=[];
+
+try{
+
+cart=JSON.parse(
+localStorage.getItem("laza_cart") || "[]"
+);
+
+if(!Array.isArray(cart))
+cart=[];
+
+}catch{
+
+cart=[];
+
+}
+
+
+let selectedPayment=null;
+
+let rechargeId=0;
+
+
+/* =========================
+   ESCAPE
+========================= */
+
+function escapeHTML(value){
+
+return String(value ?? "")
+.replaceAll("&","&amp;")
+.replaceAll("<","&lt;")
+.replaceAll(">","&gt;")
+.replaceAll('"',"&quot;")
+.replaceAll("'","&#039;");
+
+}
+
+
+/* =========================
+   MESSAGE
+========================= */
+
+function showMessage(text,type){
+
+const box=
+document.getElementById("message");
+
+box.textContent=text;
+
+box.className=
+"message "+type;
+
+window.scrollTo({
+top:0,
+behavior:"smooth"
+});
+
+}
+
+
+/* =========================
+   TOTAL
+========================= */
+
+function getTotal(){
+
+return cart.reduce(
+(sum,item)=>
+sum+
+Number(item.price || 0)*
+Number(item.quantity || 1),
+0
+);
+
+}
+
+
+/* =========================
+   DISPLAY CART
+========================= */
+
+function renderProducts(){
+
+const box=
+document.getElementById("products");
+
+box.innerHTML="";
+
+
+if(!cart.length){
+
+box.innerHTML=`
+<div style="
+text-align:center;
+color:#777;
+padding:30px
+">
+🛒 السلة خاوية
+</div>
+`;
+
+document.getElementById(
+"confirmButton"
+).disabled=true;
+
+return;
+
+}
+
+
+cart.forEach(item=>{
+
+const quantity=
+Number(item.quantity || 1);
+
+const price=
+Number(item.price || 0);
+
+
+const row=
+document.createElement("div");
+
+row.className="product";
+
+
+const image=
+item.image_url
+
+?
+
+`<img
+src="${escapeHTML(item.image_url)}"
+alt=""
+>`
+
+:
+
+`<div class="no-image">
+📦
+</div>`;
+
+
+row.innerHTML=`
+
+${image}
+
+<div class="product-info">
+
+<div class="product-name">
+${escapeHTML(item.name)}
+</div>
+
+<div class="product-details">
+الكمية: ${quantity}
+</div>
+
+</div>
+
+<div class="product-price">
+${(
+price*quantity
+).toFixed(2)} DH
+</div>
+
+`;
+
+
+box.appendChild(row);
+
+});
+
+
+document.getElementById(
+"total"
+).textContent=
+getTotal().toFixed(2);
+
+}
+
+
+/* =========================
+   PAYMENT
+========================= */
+
+function selectPayment(payment){
+
+selectedPayment=payment;
+
+document
+.getElementById("orangePayment")
+.classList.add("selected");
+
+document
+.getElementById("orangeSection")
+.style.display="block";
+
+
+if(
+!document.querySelector(".recharge")
+){
+
+addRecharge();
+
+}
+
+}
+
+
+/* =========================
+   ADD RECHARGE
+========================= */
+
+function addRecharge(){
+
+rechargeId++;
+
+const box=
+document.getElementById("recharges");
+
+
+const recharge=
+document.createElement("div");
+
+recharge.className="recharge";
+
+recharge.dataset.id=
+rechargeId;
+
+
+recharge.innerHTML=`
+
+<div class="recharge-header">
+
+<div class="recharge-number">
+تعبئة رقم ${rechargeId}
+</div>
+
+<button
+class="remove"
+type="button"
+onclick="removeRecharge(${rechargeId})"
+>
+🗑️ حذف
+</button>
+
+</div>
+
+
+<label>
+قيمة التعبئة
+</label>
+
+<input
+class="recharge-amount"
+type="number"
+min="1"
+step="1"
+placeholder="مثلاً 20"
+>
+
+
+<label>
+رمز التعبئة
+</label>
+
+<input
+class="recharge-code"
+type="text"
+autocomplete="off"
+placeholder="أدخل رمز التعبئة"
+>
+
+`;
+
+
+box.appendChild(recharge);
+
+}
+
+
+/* =========================
+   REMOVE
+========================= */
+
+function removeRecharge(id){
+
+const element=
+document.querySelector(
+`.recharge[data-id="${id}"]`
+);
+
+if(element)
+element.remove();
+
+}
+
+
+/* =========================
+   GET RECHARGES
+========================= */
+
+function getRecharges(){
+
+const elements=
+document.querySelectorAll(
+".recharge"
+);
+
+
+if(!elements.length){
+
+throw new Error(
+"خاصك تزيد تعبئة واحدة على الأقل."
+);
+
+}
+
+
+const result=[];
+
+
+for(
+const element of elements
+){
+
+const amount=
+element
+.querySelector(
+".recharge-amount"
+)
+.value.trim();
+
+
+const code=
+element
+.querySelector(
+".recharge-code"
+)
+.value.trim();
+
+
+if(!amount || !code){
+
+throw new Error(
+"عمر قيمة التعبئة ورمز التعبئة في جميع التعبئات."
+);
+
+}
+
+
+const numericAmount=
+Number(amount);
+
+
+if(
+!Number.isFinite(
+numericAmount
+) ||
+numericAmount<=0
+){
+
+throw new Error(
+"قيمة التعبئة غير صحيحة."
+);
+
+}
+
+
+result.push({
+
+amount:numericAmount,
+
+code:code
+
+});
+
+}
+
+
+return result;
+
+}
+
+
+/* =========================
+   SAVE ORDER
+========================= */
+
+async function saveOrder(
+customerName,
+customerEmail,
+recharges
+){
+
+const {data,error}=
+await db
+.from("laza_orders")
+.insert({
+
+costemer_name:
+customerName,
+
+costmwr_email:
+customerEmail,
+
+items:
+cart,
+
+total:
+getTotal(),
+
+payment_mothed:
+"orange",
+
+recharges:
+recharges,
+
+status:
+"pending"
+
+})
+.select("id")
+.single();
+
+
+if(error){
+
+throw new Error(
+"Supabase: "+
+error.message
+);
+
+}
+
+
+return data;
+
+}
+
+
+/* =========================
+   EMAIL TEXT
+========================= */
+
+function productsText(){
+
+return cart.map(
+item=>{
+
+const quantity=
+Number(
+item.quantity || 1
+);
+
+const price=
+Number(
+item.price || 0
+);
+
+return `${item.name} × ${quantity} = ${
+(price*quantity).toFixed(2)
+} DH`;
+
+}
+).join("\n");
+
+}
+
+
+function rechargesText(
+recharges
+){
+
+return recharges.map(
+(item,index)=>
+`تعبئة ${index+1}: ${item.amount} DH | الرمز: ${item.code}`
+).join("\n");
+
+}
+
+
+/* =========================
+   ADMIN EMAIL
+========================= */
+
+async function sendAdminEmail(
+orderId,
+name,
+email,
+recharges
+){
+
+await emailjs.send(
+EMAILJS_SERVICE,
+ADMIN_TEMPLATE,
+{
+
+order_id:
+String(orderId),
+
+customer_name:
+name,
+
+customer_email:
+email,
+
+payment_method:
+"Orange",
+
+products:
+productsText(),
+
+recharges:
+rechargesText(
+recharges
+),
+
+total:
+getTotal().toFixed(2),
+
+status:
+"pending"
+
+}
+);
+
+}
+
+
+/* =========================
+   CUSTOMER EMAIL
+========================= */
+
+async function sendCustomerEmail(
+orderId,
+name,
+email
+){
+
+await emailjs.send(
+EMAILJS_SERVICE,
+CUSTOMER_TEMPLATE,
+{
+
+to_email:
+email,
+
+customer_email:
+email,
+
+customer_name:
+name,
+
+order_id:
+String(orderId),
+
+payment_method:
+"Orange",
+
+products:
+productsText(),
+
+total:
+getTotal().toFixed(2),
+
+status:
+"pending"
+
+}
+);
+
+}
+
+
+/* =========================
+   CONFIRM
+========================= */
+
+async function confirmOrder(){
+
+const button=
+document.getElementById(
+"confirmButton"
+);
+
+
+try{
+
+if(!cart.length){
+
+throw new Error(
+"السلة خاوية."
+);
+
+}
+
+
+const name=
+document.getElementById(
+"customerName"
+)
+.value.trim();
+
+
+const email=
+document.getElementById(
+"customerEmail"
+)
+.value.trim();
+
+
+if(!name){
+
+throw new Error(
+"دخل الاسم ديالك."
+);
+
+}
+
+
+if(
+!email ||
+!/^[^\s@]+@[^\s@]+\.[^\s@]+$/
+.test(email)
+){
+
+throw new Error(
+"دخل إيميل صحيح."
+);
+
+}
+
+
+if(
+selectedPayment!=="orange"
+){
+
+throw new Error(
+"اختار طريقة الدفع."
+);
+
+}
+
+
+const recharges=
+getRecharges();
+
+
+button.disabled=true;
+
+button.textContent=
+"⏳ جاري إرسال الطلب...";
+
+
+/*
+حفظ الطلب
+*/
+
+const order=
+await saveOrder(
+name,
+email,
+recharges
+);
+
+
+/*
+إرسال الإيميلات
+*/
+
+let emailError=false;
+
+
+try{
+
+await sendAdminEmail(
+order.id,
+name,
+email,
+recharges
+);
+
+
+await sendCustomerEmail(
+order.id,
+name,
+email
+);
+
+}catch(error){
+
+console.error(
+"EmailJS:",
+error
+);
+
+emailError=true;
+
+}
+
+
+/*
+مسح السلة
+*/
+
+localStorage.removeItem(
+"laza_cart"
+);
+
+
+document.getElementById(
+"products"
+).innerHTML=`
+
+<div style="
+text-align:center;
+padding:30px 10px
+">
+
+<div style="
+font-size:45px
+">
+✅
+</div>
+
+<div style="
+margin-top:10px;
+font-weight:900
+">
+تم إرسال طلبك بنجاح
+</div>
+
+<div style="
+color:#777;
+margin-top:8px;
+font-size:11px
+">
+رقم الطلب
+</div>
+
+<div style="
+font-size:14px;
+font-weight:900;
+margin-top:7px;
+direction:ltr
+">
+${escapeHTML(order.id)}
+</div>
+
+</div>
+
+`;
+
+
+document.getElementById(
+"orangeSection"
+).style.display=
+"none";
+
+
+button.style.display=
+"none";
+
+
+showMessage(
+emailError
+?
+"✅ الطلب تسجل، ولكن وقع مشكل فإرسال الإيميل."
+:
+"✅ تم تسجيل الطلب وإرسال التأكيد بنجاح.",
+emailError
+?
+"error"
+:
+"success"
+);
+
+
+}catch(error){
+
+console.error(error);
+
+
+showMessage(
+"❌ "+
+error.message,
+"error"
+);
+
+
+button.disabled=false;
+
+button.textContent=
+"✅ تأكيد الطلب";
+
+}
+
+}
+
+
+/* =========================
+   START
+========================= */
+
+renderProducts();
+
+</script>
+
+</body>
+</html>
